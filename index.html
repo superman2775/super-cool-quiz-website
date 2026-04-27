@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Quiz Site</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .hidden { display: none; }
+        .question { margin: 20px 0; }
+        .options label { display: block; margin: 10px 0; }
+        #score { font-size: 24px; font-weight: bold; color: #28a745; }
+    </style>
+</head>
+<body>
+    <h1>Random Trivia Quiz</h1>
+    
+    <!-- Menu -->
+    <div id="menu">
+        <label>Category: 
+            <select id="category">
+                <option value="">Any</option>
+                <option value="9">General Knowledge</option>
+                <option value="17">Science & Nature</option>
+                <option value="21">Sports</option>
+                <option value="22">Geography</option>
+            </select>
+        </label><br><br>
+        <label>Difficulty: 
+            <select id="difficulty">
+                <option value="">Any</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </label><br><br>
+        <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+
+    <!-- Quiz -->
+    <div id="quiz" class="hidden">
+        <div id="question-container"></div>
+        <button id="next-btn" onclick="nextQuestion()" disabled>Next</button>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden">
+        <h2>Your Score: <span id="score"></span>/10</h2>
+        <p id="high-score"></p>
+        <button onclick="restart()">New Quiz</button>
+    </div>
+
+    <script>
+        let questions = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let answers = [];
+
+        // Decode HTML entities (e.g., &quot; → ")
+        function decodeHtml(html) {
+            const txt = document.createElement('textarea');
+            txt.innerHTML = html;
+            return txt.value;
+        }
+
+        async function startQuiz() {
+            const category = document.getElementById('category').value;
+            const difficulty = document.getElementById('difficulty').value;
+            let url = 'https://opentdb.com/api.php?amount=10&type=multiple';
+            if (category) url += `&category=${category}`;
+            if (difficulty) url += `&difficulty=${difficulty}`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.response_code === 0) {
+                    questions = data.results.map(q => {
+                        const opts = [...q.incorrect_answers, q.correct_answer].sort(() => Math.random() - 0.5);
+                        return { ...q, options: opts };
+                    });
+                    document.getElementById('menu').classList.add('hidden');
+                    document.getElementById('quiz').classList.remove('hidden');
+                    currentQuestion = 0;
+                    score = 0;
+                    answers = new Array(10).fill(null);
+                    showQuestion();
+                } else {
+                    alert('No questions found. Try different options!');
+                }
+            } catch (error) {
+                alert('Error fetching quiz. Check connection.');
+            }
+        }
+
+        function showQuestion() {
+            if (currentQuestion >= questions.length) {
+                showResults();
+                return;
+            }
+            const q = questions[currentQuestion];
+            document.getElementById('question-container').innerHTML = `
+                <div class="question">
+                    <h3>${decodeHtml(q.question)}</h3>
+                    ${q.options.map((opt, i) => 
+                        `<label><input type="radio" name="ans" value="${i}" onchange="selectAnswer(${i})"> ${decodeHtml(opt)}</label>`
+                    ).join('')}
+                </div>
+            `;
+            document.getElementById('next-btn').disabled = true;
+        }
+
+        function selectAnswer(index) {
+            answers[currentQuestion] = index;
+            document.getElementById('next-btn').disabled = false;
+        }
+
+        function nextQuestion() {
+            const selected = answers[currentQuestion];
+            if (selected === questions[currentQuestion].options.indexOf(questions[currentQuestion].correct_answer)) {
+                score++;
+            }
+            currentQuestion++;
+            showQuestion();
+        }
+
+        function showResults() {
+            document.getElementById('quiz').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('score').textContent = score;
+            const highScore = localStorage.getItem('highScore') || 0;
+            if (score > highScore) {
+                localStorage.setItem('highScore', score);
+                document.getElementById('high-score').textContent = 'New high score!';
+            } else {
+                document.getElementById('high-score').textContent = `Best: ${highScore}/10`;
+            }
+        }
+
+        function restart() {
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('menu').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
